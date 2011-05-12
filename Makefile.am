@@ -458,7 +458,8 @@ libsystemd_basic_la_SOURCES = \
 	src/socket-util.c \
 	src/log.c \
 	src/ratelimit.c \
-	src/exit-status.c
+	src/exit-status.c \
+	src/utf8-util.c
 
 libsystemd_basic_la_CFLAGS = \
 	$(AM_CFLAGS) \

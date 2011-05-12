@@ -74,6 +74,8 @@ typedef struct dual_timestamp {
 
 usec_t now(clockid_t clock);
 
+int alarm_ns(clockid_t clock, unsigned int ns);
+
 dual_timestamp* dual_timestamp_get(dual_timestamp *ts);
 
 #define dual_timestamp_is_set(ts) ((ts)->realtime > 0)
@@ -276,6 +278,7 @@ char *format_timestamp(char *buf, size_t l, usec_t t);
 char *format_timestamp_pretty(char *buf, size_t l, usec_t t);
 char *format_timespan(char *buf, size_t l, usec_t t);
 
+int sane_dup2 (int fd1, int fd2);
 int make_stdio(int fd);
 int make_null_stdio(void);
 
@@ -332,6 +335,8 @@ int close_pipe(int p[]);
 
 ssize_t loop_read(int fd, void *buf, size_t nbytes, bool do_poll);
 ssize_t loop_write(int fd, const void *buf, size_t nbytes, bool do_poll);
+
+ssize_t read_all(int fd, void **buf, size_t *nbytes);
 
 int path_is_mount_point(const char *path);
 
@@ -397,6 +402,9 @@ int detect_container(const char **id);
 int detect_virtualization(const char **id);
 
 void execute_directory(const char *directory, DIR *_d, char *argv[]);
+
+int spawn_async_with_pipes(const char **argv, int *pid,
+                           int *in, int *out, int *err);
 
 int kill_and_sigcont(pid_t pid, int sig);
 

@@ -99,6 +99,44 @@ usec_t now(clockid_t clock_id) {
         return timespec_load(&ts);
 }
 
+int alarm_ns(clockid_t clock_id, unsigned int ns) {
+        #define NS_PRE_SEC (1000 * 1000 * 1000)
+
+        static timer_t timerid = (timer_t) -1;
+        struct sigevent sig_periodic = {
+                .sigev_notify = SIGEV_SIGNAL,
+                .sigev_signo = SIGALRM,
+        };
+        struct itimerspec interval = {
+                .it_interval = { ns / NS_PRE_SEC, ns % NS_PRE_SEC },
+                .it_value = { ns / NS_PRE_SEC, ns % NS_PRE_SEC },
+        };
+        int r = 0;
+
+        if (ns) {
+                if (timerid == (timer_t) -1) {
+                        if (timer_create(clock_id, &sig_periodic, &timerid) < 0) {
+                                r = -errno;
+                                goto finish;
+                        }
+                }
+
+                if (timer_settime(timerid, 0, &interval, NULL) < 0) {
+                        r = -errno;
+                        goto finish;
+                }
+        }
+
+finish:
+        if ((r < 0 || ns == 0) &&
+             timerid != (timer_t) -1) {
+                timer_delete(timerid);
+                timerid = (timer_t) -1;
+        }
+
+        return r;
+}
+
 dual_timestamp* dual_timestamp_get(dual_timestamp *ts) {
         assert(ts);
 
@@ -2734,6 +2772,65 @@ ssize_t loop_write(int fd, const void *buf, size_t nbytes, bool do_poll) {
         return n;
 }
 
+ssize_t read_all(int fd, void **buf, size_t *nbytes) {
+        uint8_t *b;
+        int offset = 0;
+        int m = 1024, b_len = m;
+
+        ssize_t n = 0;
+
+        assert(fd >= 0);
+        assert(buf);
+
+        b = malloc(b_len);
+        if (!b)
+                return -ENOMEM;
+
+        while (true) {
+                ssize_t k = read(fd, b + offset, m);
+
+                if (k > 0)
+                        n += k;
+
+                if (k == m) {
+                        uint8_t *new_b;
+
+                        offset += m;
+                        /* Max step: 2M  */
+                        m = m <= 1024 * 1024 ? m * 2 : m;
+                        b_len += m;
+
+                        if (!(new_b = realloc(b, b_len))) {
+                                n = -ENOMEM;
+                                break;
+                        }
+
+                        b = new_b;
+                        continue;
+                }
+
+                if (k < 0) {
+                        if (errno == EINTR)
+                                continue;
+                        else if (errno != EAGAIN)
+                                n = -errno;
+                }
+
+                break;
+        }
+
+        if (n <= 0) {
+                free(b);
+                b = NULL;
+        }
+
+        *buf = b;
+        if (nbytes)
+                *nbytes = n < 0 ? 0 : n;
+
+        return n;
+}
+
 int path_is_mount_point(const char *t) {
         struct stat a, b;
         char *parent;
@@ -2821,14 +2918,26 @@ int parse_usec(const char *t, usec_t *usec) {
         return 0;
 }
 
+int sane_dup2 (int fd1, int fd2)
+{
+        int ret;
+
+retry:
+        ret = dup2 (fd1, fd2);
+        if (ret < 0 && errno == EINTR)
+                goto retry;
+
+        return ret;
+}
+
 int make_stdio(int fd) {
         int r, s, t;
 
         assert(fd >= 0);
 
-        r = dup2(fd, STDIN_FILENO);
-        s = dup2(fd, STDOUT_FILENO);
-        t = dup2(fd, STDERR_FILENO);
+        r = sane_dup2(fd, STDIN_FILENO);
+        s = sane_dup2(fd, STDOUT_FILENO);
+        t = sane_dup2(fd, STDERR_FILENO);
 
         if (fd >= 3)
                 close_nointr_nofail(fd);
@@ -4292,6 +4401,101 @@ finish:
 
         if (pids)
                 hashmap_free_free(pids);
+}
+
+int spawn_async_with_pipes(const char **argv, int *pid,
+                           int *in, int *out, int *err) {
+        int r = 0;
+        pid_t _pid = (pid_t) -1;
+        int _in[2] = { -1, -1 }, _out[2] = { -1, -1 }, _err[2] = { -1, -1 };
+        bool dup_stderr = err == out;
+
+        if (in) {
+                if (pipe(_in) < 0) {
+                        r = -errno;
+                        goto finish;
+                }
+        }
+
+        if (out) {
+                if (pipe(_out) < 0) {
+                        r = -errno;
+                        goto finish;
+                }
+        }
+
+        if (err && !dup_stderr) {
+                if (pipe(_err) < 0) {
+                        r = -errno;
+                        goto finish;
+                }
+        }
+
+        if ((_pid = fork()) < 0) {
+                r = -errno;
+                goto finish;
+        } else if (_pid == 0) { /* Child */
+                sigset_t mask;
+
+                /* Revert signal block states -- don't block any signal */
+                assert_se(sigemptyset(&mask) == 0);
+                assert_se(sigprocmask(SIG_SETMASK, &mask, NULL) == 0);
+
+                while (true) {
+                        if (in &&
+                            sane_dup2(_in[0], STDIN_FILENO) < 0) {
+                                break;
+                        }
+                        if (out &&
+                            sane_dup2(_out[1], STDOUT_FILENO) < 0) {
+                                break;
+                        }
+                        if (err &&
+                            sane_dup2(dup_stderr? _out[1] : _err[1], STDERR_FILENO) < 0) {
+                                break;
+                        }
+
+                        close_pipe(_in);
+                        close_pipe(_out);
+                        close_pipe(_err);
+
+                        execv(argv[0], (char**) argv);
+                        break;
+                };
+
+                _exit(8); /* Operational error */
+        } else { /* pid > 0 <== parent  */
+                if (in) {
+                        close_nointr(_in[0]);
+                        _in[0] = -1;
+                }
+                if (out) {
+                        close_nointr(_out[1]);
+                        _out[1] = -1;
+                }
+                if (err && !dup_stderr) {
+                        close_nointr(_err[1]);
+                        _err[1] = -1;
+                }
+        }
+
+finish:
+        if (r < 0) {
+                close_pipe(_in);
+                close_pipe(_out);
+                close_pipe(_err);
+        }
+
+        if (in)
+                *in = _in[1];
+        if (out)
+                *out = _out[0];
+        if (err)
+                *err = dup_stderr ? _out[0] : _err[0];
+        if (pid)
+                *pid = (int) _pid;
+
+        return r;
 }
 
 int kill_and_sigcont(pid_t pid, int sig) {
