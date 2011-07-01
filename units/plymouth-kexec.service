@@ -14,5 +14,6 @@ ConditionKernelCommandLine=!plymouth.enable=0
 
 [Service]
 ExecStart=/sbin/plymouthd --mode=shutdown
-ExecStartPost=-/bin/plymouth --show-splash
+ExecStartPost=-/bin/plymouth --show-splash --ignore-replies
+ExecStartPost=-/bin/plymouth display-message --text "Rebooting via kexec ..." --ignore-replies
 Type=forking

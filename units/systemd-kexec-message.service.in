@@ -1,0 +1,9 @@
+[Unit]
+Description=Show Reboot via kexec Message On tty1-tty6
+After=getty@tty1.service
+Before=kexec.target plymouth-kexec.service
+DefaultDependencies=no
+
+[Service]
+ExecStart=@rootlibexecdir@/systemd-shutdown-message 'System Is Now Rebooting via kexec ...'
+Type=oneshot

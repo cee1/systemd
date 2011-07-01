@@ -1,0 +1,9 @@
+[Unit]
+Description=Show Poweroff Message On tty1-tty6
+After=getty@tty1.service
+Before=poweroff.target plymouth-poweroff.service
+DefaultDependencies=no
+
+[Service]
+ExecStart=@rootlibexecdir@/systemd-shutdown-message 'System Is Now Poweroffing ...'
+Type=oneshot

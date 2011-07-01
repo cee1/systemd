@@ -1,0 +1,9 @@
+[Unit]
+Description=Show Halt Message On tty1-tty6
+After=getty@tty1.service
+Before=halt.target plymouth-halt.service
+DefaultDependencies=no
+
+[Service]
+ExecStart=@rootlibexecdir@/systemd-shutdown-message 'System Is Now Halting ...'
+Type=oneshot

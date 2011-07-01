@@ -1,0 +1,10 @@
+[Unit]
+Description=Hide Plymouth Shutdown Screen
+After=plymouth-reboot.service plymouth-halt.service plymouth-poweroff.service plymouth-kexec.service
+Before=reboot.service halt.service poweroff.service kexec.service
+DefaultDependencies=no
+
+[Service]
+ExecStart=-/bin/sh -c '(/bin/plymouth --hide-splash; /bin/chvt 1)&'
+Type=oneshot
+TimeoutSec=1

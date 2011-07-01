@@ -158,7 +158,8 @@ rootlibexec_PROGRAMS = \
 	systemd-ac-power \
 	systemd-detect-virt \
 	systemd-sysctl \
-        systemd-hostnamed
+	systemd-hostnamed \
+	systemd-shutdown-message
 
 if ENABLE_BINFMT
 rootlibexec_PROGRAMS += \
@@ -330,7 +331,11 @@ nodist_systemunit_DATA = \
 	units/fsck@.service \
 	units/fsck-root.service \
 	units/quotacheck.service \
-	units/rescue.service
+	units/rescue.service \
+	units/systemd-halt-message.service \
+	units/systemd-poweroff-message.service \
+	units/systemd-reboot-message.service \
+	units/systemd-kexec-message.service
 
 if ENABLE_BINFMT
 nodist_systemunit_DATA += \
@@ -374,6 +379,10 @@ EXTRA_DIST = \
 	units/poweroff.service.in \
 	units/reboot.service.in \
 	units/kexec.service.in \
+	units/systemd-halt-message.service.in \
+	units/systemd-poweroff-message.service.in \
+	units/systemd-reboot-message.service.in \
+	units/systemd-kexec-message.service.in \
 	units/user/exit.service.in \
 	units/fsck@.service.in \
 	units/fsck-root.service.in \
@@ -416,6 +425,8 @@ dist_systemunit_DATA += \
 	units/plymouth-kexec.service \
 	units/plymouth-poweroff.service \
 	units/plymouth-halt.service \
+	units/plymouth-shutdown-splash-hide.service \
+	units/plymouth-shutdown-splash-hide.timer \
 	units/systemd-ask-password-plymouth.path
 
 nodist_systemunit_DATA += \
@@ -819,6 +830,15 @@ systemd_shutdown_CFLAGS = \
 systemd_shutdown_LDADD = \
 	libsystemd-basic.la \
 	$(UDEV_LIBS)
+
+systemd_shutdown_message_SOURCES = \
+	src/shutdown-message.c
+
+systemd_shutdown_message_CFLAGS = \
+	$(AM_CFLAGS)
+
+systemd_shutdown_message_LDADD = \
+	libsystemd-basic.la
 
 systemd_modules_load_SOURCES = \
 	src/modules-load.c
@@ -1461,6 +1481,24 @@ endif
 	( cd $(DESTDIR)$(dbussessionservicedir) && \
 		rm -f org.freedesktop.systemd1.service && \
 		$(LN_S) ../system-services/org.freedesktop.systemd1.service org.freedesktop.systemd1.service )
+	$(MKDIR_P) -m 0755 \
+		$(DESTDIR)$(SYSTEM_SYSVINIT_PATH) \
+		$(DESTDIR)$(systemunitdir)/reboot.target.wants \
+		$(DESTDIR)$(systemunitdir)/kexec.target.wants \
+		$(DESTDIR)$(systemunitdir)/poweroff.target.wants \
+		$(DESTDIR)$(systemunitdir)/halt.target.wants
+	( cd $(DESTDIR)$(systemunitdir)/reboot.target.wants && \
+		rm -f systemd-reboot-message.service && \
+		$(LN_S) ../systemd-reboot-message.service systemd-reboot-message.service )
+	( cd $(DESTDIR)$(systemunitdir)/kexec.target.wants && \
+		rm -f systemd-kexec-message.service && \
+		$(LN_S) ../systemd-kexec-message.service systemd-kexec-message.service )
+	( cd $(DESTDIR)$(systemunitdir)/poweroff.target.wants && \
+		rm -f systemd-poweroff-message.service && \
+		$(LN_S) ../systemd-poweroff-message.service systemd-poweroff-message.service )
+	( cd $(DESTDIR)$(systemunitdir)/halt.target.wants && \
+		rm -f systemd-halt-message.service && \
+		$(LN_S) ../systemd-halt-message.service systemd-halt-message.service )
 if HAVE_PLYMOUTH
 	$(MKDIR_P) -m 0755 \
 		$(DESTDIR)$(SYSTEM_SYSVINIT_PATH) \
@@ -1477,17 +1515,21 @@ if HAVE_PLYMOUTH
 		$(LN_S) ../plymouth-quit.service plymouth-quit.service && \
 		$(LN_S) ../plymouth-quit-wait.service plymouth-quit-wait.service )
 	( cd $(DESTDIR)$(systemunitdir)/reboot.target.wants && \
-		rm -f plymouth-reboot.service && \
-		$(LN_S) ../plymouth-reboot.service plymouth-reboot.service )
+		rm -f plymouth-reboot.service plymouth-shutdown-splash-hide.timer && \
+		$(LN_S) ../plymouth-reboot.service plymouth-reboot.service && \
+		$(LN_S) ../plymouth-shutdown-splash-hide.timer plymouth-shutdown-splash-hide.timer )
 	( cd $(DESTDIR)$(systemunitdir)/kexec.target.wants && \
-		rm -f plymouth-kexec.service && \
-		$(LN_S) ../plymouth-kexec.service plymouth-kexec.service )
+		rm -f plymouth-kexec.service plymouth-shutdown-splash-hide.timer && \
+		$(LN_S) ../plymouth-kexec.service plymouth-kexec.service && \
+		$(LN_S) ../plymouth-shutdown-splash-hide.timer plymouth-shutdown-splash-hide.timer )
 	( cd $(DESTDIR)$(systemunitdir)/poweroff.target.wants && \
-		rm -f plymouth-poweroff.service && \
-		$(LN_S) ../plymouth-poweroff.service plymouth-poweroff.service )
+		rm -f plymouth-poweroff.service plymouth-shutdown-splash-hide.timer && \
+		$(LN_S) ../plymouth-poweroff.service plymouth-poweroff.service && \
+		$(LN_S) ../plymouth-shutdown-splash-hide.timer plymouth-shutdown-splash-hide.timer )
 	( cd $(DESTDIR)$(systemunitdir)/halt.target.wants && \
-		rm -f plymouth-halt.service && \
-		$(LN_S) ../plymouth-halt.service plymouth-halt.service )
+		rm -f plymouth-halt.service plymouth-shutdown-splash-hide.timer && \
+		$(LN_S) ../plymouth-halt.service plymouth-halt.service && \
+		$(LN_S) ../plymouth-shutdown-splash-hide.timer plymouth-shutdown-splash-hide.timer )
 endif
 if TARGET_MEEGO
 	$(MKDIR_P) -m 0755 $(DESTDIR)$(systemunitdir)/final.target.wants
