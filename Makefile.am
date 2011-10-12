@@ -166,6 +166,11 @@ rootlibexec_PROGRAMS += \
 	systemd-binfmt
 endif
 
+if HAVE_PLYMOUTH
+rootlibexec_PROGRAMS += \
+	plymouth-quit-wait
+endif
+
 systemgenerator_PROGRAMS = \
 	systemd-getty-generator
 
@@ -1173,6 +1178,17 @@ systemd_tty_ask_password_agent_SOURCES = \
 
 systemd_tty_ask_password_agent_LDADD = \
 	libsystemd-basic.la
+
+if HAVE_PLYMOUTH
+plymouth_quit_wait_LDADD = \
+	libsystemd-basic.la
+
+plymouth_quit_wait_CFLAGS = \
+	$(AM_CFLAGS)
+
+plymouth_quit_wait_SOURCES = \
+	src/ply-quit-wait.c
+endif
 
 pam_systemd_la_SOURCES = \
 	src/pam-module.c \

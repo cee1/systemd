@@ -6,10 +6,10 @@
 #  (at your option) any later version.
 
 [Unit]
-Description=Wait for Plymouth Boot Screen to Quit
+Description=Wait for Plymouth Boot Screen to Quit in 15 Seconds
 After=rc-local.service plymouth-start.service
 
 [Service]
-ExecStart=-/bin/plymouth --wait
+ExecStart=-/lib/systemd/plymouth-quit-wait 15
 Type=oneshot
 TimeoutSec=20
