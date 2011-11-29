@@ -1997,6 +1997,7 @@ static int load_from_path(Unit *u, const char *path) {
                 { "FreeBind",               config_parse_bool,            0, &u->socket.free_bind,                            "Socket"  },
                 { "Transparent",            config_parse_bool,            0, &u->socket.transparent,                          "Socket"  },
                 { "Broadcast",              config_parse_bool,            0, &u->socket.broadcast,                            "Socket"  },
+                { "PassCred",               config_parse_bool,            0, &u->socket.pass_cred,                            "Socket"  },
                 { "TCPCongestion",          config_parse_string,          0, &u->socket.tcp_congestion,                       "Socket"  },
                 { "MessageQueueMaxMessages", config_parse_long,           0, &u->socket.mq_maxmsg,                            "Socket"  },
                 { "MessageQueueMessageSize", config_parse_long,           0, &u->socket.mq_msgsize,                           "Socket"  },
