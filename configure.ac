@@ -116,6 +116,7 @@ LT_INIT
 
 AC_SEARCH_LIBS([clock_gettime], [rt], [], [AC_MSG_ERROR([*** POSIX RT library not found])])
 AC_SEARCH_LIBS([dlsym], [dl], [], [AC_MSG_ERROR([*** Dynamic linking loader library not found])])
+AC_SEARCH_LIBS([pthread_create], [pthread], [], [AC_MSG_ERROR([*** POSIX thread library not found])])
 
 save_LIBS="$LIBS"
 LIBS=

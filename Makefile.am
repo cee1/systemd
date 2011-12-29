@@ -208,7 +208,8 @@ noinst_PROGRAMS = \
 	test-cgroup \
 	test-env-replace \
 	test-strv \
-	test-install
+	test-install \
+	test-work-queue
 
 dist_pkgsysconf_DATA = \
 	src/system.conf \
@@ -468,7 +469,8 @@ libsystemd_basic_la_SOURCES = \
 	src/socket-util.c \
 	src/log.c \
 	src/ratelimit.c \
-	src/exit-status.c
+	src/exit-status.c \
+	src/work-queue.c
 
 libsystemd_basic_la_CFLAGS = \
 	$(AM_CFLAGS) \
@@ -802,6 +804,15 @@ test_install_CFLAGS = \
 	$(DBUS_CFLAGS)
 
 test_install_LDADD = \
+	libsystemd-basic.la
+
+test_work_queue_SOURCES = \
+	src/test-work-queue.c
+
+test_work_queue_CFLAGS = \
+	$(AM_CFLAGS)
+
+test_work_queue_LDADD = \
 	libsystemd-basic.la
 
 systemd_initctl_SOURCES = \
