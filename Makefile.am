@@ -159,7 +159,11 @@ rootlibexec_PROGRAMS = \
 	systemd-detect-virt \
 	systemd-sysctl \
 	systemd-hostnamed \
-	systemd-shutdown-message
+	systemd-shutdown-message \
+	dev-of-rootdir-helper
+
+rootlibexec_SCRIPTS = \
+	src/emergency-guide
 
 if ENABLE_BINFMT
 rootlibexec_PROGRAMS += \
@@ -904,6 +908,16 @@ systemd_fsck_LDADD = \
 	libsystemd-basic.la \
 	$(UDEV_LIBS) \
 	$(DBUS_LIBS)
+
+dev_of_rootdir_helper_SOURCES = \
+	src/dev-of-rootdir-helper.c
+
+dev_of_rootdir_helper_CFLAGS = \
+	$(AM_CFLAGS) \
+	$(UDEV_CFLAGS)
+
+dev_of_rootdir_helper_LDADD = \
+	$(UDEV_LIBS)
 
 systemd_quotacheck_SOURCES = \
 	src/quotacheck.c

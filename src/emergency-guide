@@ -1,0 +1,141 @@
+#!/bin/bash
+set -e
+
+load_string_en()
+{
+	_0PROMPT="System failure detected, enter emergency mode."
+	_0FAILED_PARTS="Filesystem check failed on"
+	_0ASK_AUTO_FSCK="Try to fix them automatically? (Y/N) "
+	_0AUTO_FSCK="Checking and fixing Filesystem errors ..."
+	_0AUTO_FSCK_CANCEL="Auto fix cancelled"
+	_0AUTO_FSCK_FAILED="Failed to fix errors on"
+	_0AUTO_FSCK_FAILED_INTERNAL="Internal error of fsck when checking"
+	_0AUTO_FSCK_SUCCESS="Succeed to fix errors on"
+	_0EMERGENCY_CONSOLE_PROMPT1='Enter root password to enter emergency console.'
+	_0EMERGENCY_CONSOLE_PROMPT2='After fixing manually, use "systemctl default" or ^D to activate default mode.'
+}
+
+load_string_zh_CN()
+{
+	_0PROMPT="系统检测到异常，进入紧急模式."
+	_0FAILED_PARTS="以下分区上的文件系统检查失败："
+	_0ASK_AUTO_FSCK="尝试自动修复吗? (Y/N) "
+	_0AUTO_FSCK="检查和修复文件系统错误..."
+	_0AUTO_FSCK_CANCEL="自动修复文件系统被取消"
+	_0AUTO_FSCK_FAILED="修复文件系统失败，分区为"
+	_0AUTO_FSCK_FAILED_INTERNAL="修复文件系统时出现内部错误，分区为"
+	_0AUTO_FSCK_SUCCESS="修复文件系统成功，分区为"
+	_0EMERGENCY_CONSOLE_PROMPT1='请输入管理员密码以进入紧急控制台'
+	_0EMERGENCY_CONSOLE_PROMPT2='手动修复后, 请输入"systemctl default"或^D来回到默认模式'
+}
+
+load_i18n()
+{
+	. /etc/default/locale
+
+	load_string_en
+
+	case "$LANG" in
+	zh_CN.*)
+		load_string_zh_CN
+		;;
+	esac
+}
+
+echo_failed_service()
+{
+	echo "======"
+	systemctl --failed
+	echo "======"
+}
+
+get_failed_fsck_blocks()
+{
+	local _parts=`systemctl --failed | grep 'fsck-.*\.service' -o` || true
+	local parts=
+	local p=
+
+	[ -n "$_parts" ] || return 1
+	for p in $_parts
+	do
+		p=`echo $p | sed -n 's/.*-\|\..*//gp'`
+		if [ "$p" = 'root' ]; then
+			p=`/lib/systemd/dev-of-rootdir-helper`
+		else
+			p="/dev/$p"
+		fi
+		echo -n "  $p"
+	done
+}
+
+auto_fsck()
+{
+	local parts="$1"
+	local ret=0
+	local fsck_ret=
+
+	for p in $parts
+	do
+		echo "fsck -y -l $p"
+set +e
+		fsck -y -l "$p"
+		fsck_ret=$?
+set -e
+		case $fsck_ret in
+			0|1|2)
+				;;
+			4)
+				echo "$_0AUTO_FSCK_FAILED $p"
+				ret=1
+				;;
+			*)
+				echo "$_0AUTO_FSCK_FAILED_INTERNAL(\$?=$fsck_ret) $p"
+				ret=1
+				;;
+		esac
+	done
+
+	if [ $ret -eq 0 ]; then
+		echo "$_0AUTO_FSCK_SUCCESS $parts"
+	fi
+
+	return $ret
+}
+
+auto_fsck_ask()
+{
+	local parts=`get_failed_fsck_blocks` || true
+	local Y_N=
+	local drop=
+
+	[ -n "$parts" ] || return 3
+	echo "$_0FAILED_PARTS $parts"
+
+	while true
+	do
+		read -n 1 -p "$_0ASK_AUTO_FSCK" Y_N
+		case "$Y_N" in
+		y|Y)
+			echo "  $_0AUTO_FSCK"
+			auto_fsck "$parts" || return 1
+			return 0
+			;;
+		n|N)
+			echo "  $_0AUTO_FSCK_CANCEL"
+			return 2
+			break
+			;;
+		esac
+	done
+}
+
+
+load_i18n
+echo "$_0PROMPT"
+
+echo_failed_service
+if ! auto_fsck_ask; then
+	echo "$_0EMERGENCY_CONSOLE_PROMPT1"
+	echo "$_0EMERGENCY_CONSOLE_PROMPT2"
+	/sbin/sulogin
+fi
