@@ -661,12 +661,20 @@ finish:
 int read_full_file(const char *fn, char **contents) {
         FILE *f;
         int r;
-        size_t n, l;
-        char *buf = NULL;
-        struct stat st;
 
         if (!(f = fopen(fn, "re")))
                 return -errno;
+
+        r = read_full_file_FILE(f, contents);
+        fclose(f);
+        return r;
+}
+
+int read_full_file_FILE(FILE *f, char **contents) {
+        int r;
+        size_t n, l;
+        char *buf = NULL;
+        struct stat st;
 
         if (fstat(fileno(f), &st) < 0) {
                 r = -errno;
@@ -720,7 +728,6 @@ int read_full_file(const char *fn, char **contents) {
         r = 0;
 
 finish:
-        fclose(f);
         free(buf);
 
         return r;

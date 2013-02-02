@@ -203,6 +203,7 @@ int get_starttime_of_pid(pid_t pid, unsigned long long *st);
 
 int write_one_line_file(const char *fn, const char *line);
 int read_one_line_file(const char *fn, char **line);
+int read_full_file_FILE(FILE *f, char **contents);
 int read_full_file(const char *fn, char **contents);
 
 int parse_env_file(const char *fname, const char *separator, ...) _sentinel_;

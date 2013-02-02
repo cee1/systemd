@@ -83,6 +83,40 @@ static FILE* serialization = NULL;
 static void nop_handler(int sig) {
 }
 
+static void more_debug(void) {
+	int smaps_fd = -1, smaps_dump = -1;
+	ssize_t n;
+	char buffer[4096*16] = {0,};
+
+	log_error("%s() Trying to dump /proc/1/smaps to /systemd-1-smaps...", __func__);
+
+	if ((smaps_fd = open("/proc/1/smaps", O_RDONLY | O_CLOEXEC)) < 0) {
+		log_error("Failed to OPEN /proc/1/smaps: %m");
+		goto out;
+	}
+
+	if ((smaps_dump = open("/systemd-1-smaps",
+				O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC,
+				S_IRUSR)) < 0) {
+		log_error("Failed to OPEN /systemd-1-smaps for write: %m");
+		goto out;
+	}
+
+	if ((n = loop_read(smaps_fd, buffer, sizeof(buffer), false) < 0)) {
+		log_error("Error when reading /proc/1/smaps: %s", strerror(-n));
+		goto out;
+	}
+
+	if ((n = loop_write(smaps_dump, buffer, sizeof(buffer), false) < 0)) {
+		log_error("Error when writing /systemd-1-smaps: %s", strerror(-n));
+		goto out;
+	}
+
+out:
+	close(smaps_fd);
+	close(smaps_dump);
+}
+
 _noreturn_ static void crash(int sig) {
 
         if (!arg_dump_core)
@@ -90,6 +124,8 @@ _noreturn_ static void crash(int sig) {
         else {
                 struct sigaction sa;
                 pid_t pid;
+
+                log_error("Caught <%s>, try dumping core, and more...", signal_to_string(sig));
 
                 /* We want to wait for the core process, hence let's enable SIGCHLD */
                 zero(sa);
@@ -127,6 +163,7 @@ _noreturn_ static void crash(int sig) {
                         siginfo_t status;
                         int r;
 
+			more_debug();
                         /* Order things nicely. */
                         if ((r = wait_for_terminate(pid, &status)) < 0)
                                 log_error("Caught <%s>, waitpid() failed: %s", signal_to_string(sig), strerror(-r));
@@ -172,7 +209,7 @@ _noreturn_ static void crash(int sig) {
                 log_info("Successfully spawned crash shall as pid %lu.", (unsigned long) pid);
         }
 
-        log_info("Freezing execution.");
+        log_info("%s() Freezing execution.", __func__);
         freeze();
 }
 
@@ -1290,7 +1327,7 @@ int main(int argc, char *argv[]) {
 
                 case MANAGER_EXIT:
                         retval = EXIT_SUCCESS;
-                        log_debug("Exit.");
+                        log_info("Exit.");
                         goto finish;
 
                 case MANAGER_RELOAD:
@@ -1300,6 +1337,7 @@ int main(int argc, char *argv[]) {
                         break;
 
                 case MANAGER_REEXECUTE:
+                        log_info("Reexecute.");
                         if (prepare_reexecute(m, &serialization, &fds) < 0)
                                 goto finish;
 
@@ -1414,8 +1452,10 @@ finish:
                 log_error("Failed to execute shutdown binary, freezing: %m");
         }
 
-        if (getpid() == 1)
+        if (getpid() == 1) {
+                log_info("%s() Freezing execution.", __func__);
                 freeze();
+        }
 
         return retval;
 }
